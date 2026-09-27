@@ -98,8 +98,14 @@ if [ "${1:-}" != "--no-install" ]; then
   # tells the truth and costs nothing.
   KEY="--key $ASC_KEY_PATH"
   KEY="$KEY --key-id $ASC_KEY_ID --issuer $ASC_ISSUER_ID"
-  ID=$(xcrun notarytool submit "$ZIP" $KEY 2>&1 | awk '/^ *id: /{print $2; exit}')
-  if [ -z "$ID" ]; then echo "could not submit to Apple"; exit 1; fi
+  # Capture it all first. Piping into `awk ... exit` closes the pipe early,
+  # notarytool dies of SIGPIPE, pipefail sees it and the script walks out
+  # silently after printing "notarising…".
+  SUBMIT=$(xcrun notarytool submit "$ZIP" $KEY 2>&1)
+  ID=$(printf '%s\n' "$SUBMIT" | awk '/^ *id: /{print $2}' | head -1)
+  if [ -z "$ID" ]; then
+    echo "could not submit to Apple:"; printf '%s\n' "$SUBMIT" | head -5; exit 1
+  fi
   echo "submission $ID"
   STATUS=""
   for _ in $(seq 1 60); do                    # up to about 20 minutes
