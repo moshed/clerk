@@ -18,9 +18,12 @@ PROJ = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
 DROP = ["AppDelegate.swift", "ViewController.swift", "Main.storyboard", "Main.html",
         "Icon.png", "Style.css", "Script.js"]
 
+# Every hand-written source. A new file in Core/ is NOT picked up on its own -
+# the project is regenerated from scratch each build, so it has to be listed.
 ADD = ["ClerkApp.swift", "SettingsView.swift", "ShortcutRecorder.swift",
        "Core/Fields.swift", "Core/Store.swift", "Core/Match.swift",
-       "Core/Jev.swift", "Core/Server.swift", "Core/Importer.swift"]
+       "Core/Jev.swift", "Core/OnDevice.swift", "Core/Server.swift",
+       "Core/Importer.swift"]
 
 
 def oid():

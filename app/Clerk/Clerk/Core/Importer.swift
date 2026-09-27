@@ -163,6 +163,41 @@ enum Importer {
         return false
     }
 
+    /// The same job, done by Apple's on-device model. Nothing leaves the Mac,
+    /// so nothing is held back.
+    private static func onDevice(_ rows: [ImportRow], people: [Person]) async -> [ImportRow] {
+        let todo = rows.enumerated().filter { $0.element.type == nil }
+        guard !todo.isEmpty else { return rows }
+
+        let fields = Fields.all.map { (key: $0.key, question: $0.question) }
+        let names = people.map { (id: $0.id, name: $0.displayName) }
+
+        var out = rows
+        await withTaskGroup(of: (Int, String, String?)?.self) { group in
+            for (i, row) in todo {
+                group.addTask {
+                    let line = row.rawLabel.isEmpty
+                        ? row.value : "\(row.rawLabel): \(row.value)"
+                    guard let got = await OnDevice.read(line: line, fields: fields,
+                                                        people: names)
+                    else { return nil }
+                    return (i, got.field, got.person)
+                }
+            }
+            for await r in group {
+                guard let (i, type, person) = r else { continue }
+                out[i].type = type
+                if let person { out[i].personID = person }
+                // It gives one answer rather than a spread, so there is no gap to
+                // judge it by. Ticked, and shown for checking like everything else.
+                out[i].sure = true
+                out[i].include = true
+                out[i].why = "read on this Mac: \(type)"
+            }
+        }
+        return out
+    }
+
     /// The check digit every payment card carries.
     private static func luhn(_ digits: String) -> Bool {
         var sum = 0
@@ -188,9 +223,18 @@ enum Importer {
 
     static func classifyLeftovers(_ rows: [ImportRow], people: [Person],
                                   key: String) async -> [ImportRow] {
+        guard !Match.offline else { return rows }
+
+        // Apple's model runs on this Mac, so it may read EVERY leftover line,
+        // card and bank numbers included. Jev is a fallback and still never sees
+        // those - see `sensitive`.
+        if OnDevice.available {
+            return await onDevice(rows, people: people)
+        }
+
         let todo = rows.enumerated()
             .filter { $0.element.type == nil && !sensitive($0.element) }
-        guard !todo.isEmpty, !Match.offline else { return rows }
+        guard !todo.isEmpty else { return rows }
 
         var out = rows
         await withTaskGroup(of: (Int, String?, Double, String?)?.self) { group in

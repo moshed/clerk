@@ -91,11 +91,30 @@ if [ "${1:-}" != "--no-install" ]; then
   ZIP="${TMPDIR:-/tmp}/Clerk-notarize.zip"
   rm -f "$ZIP"
   ditto -c -k --keepParent "$APP" "$ZIP"
-  xcrun notarytool submit "$ZIP" \
-    --key $ASC_KEY_PATH \
-    --key-id $ASC_KEY_ID \
-    --issuer $ASC_ISSUER_ID \
-    --wait
+  # Submit, then poll. `--wait` gives up after a few minutes and reports
+  # "HTTPClientError.deadlineExceeded", which reads like the upload failed. It
+  # did not: on 2026-09-23 six runs in a row "failed" that way while every
+  # submission was sitting in Apple's queue, accepted later. Polling `info`
+  # tells the truth and costs nothing.
+  KEY="--key $ASC_KEY_PATH"
+  KEY="$KEY --key-id $ASC_KEY_ID --issuer $ASC_ISSUER_ID"
+  ID=$(xcrun notarytool submit "$ZIP" $KEY 2>&1 | awk '/^ *id: /{print $2; exit}')
+  if [ -z "$ID" ]; then echo "could not submit to Apple"; exit 1; fi
+  echo "submission $ID"
+  STATUS=""
+  for _ in $(seq 1 60); do                    # up to about 20 minutes
+    STATUS=$(xcrun notarytool info "$ID" $KEY 2>&1 | awk '/status:/{print $2}')
+    [ "$STATUS" = "Accepted" ] && break
+    case "$STATUS" in Invalid|Rejected) break;; esac
+    printf "."
+    sleep 20
+  done
+  echo " $STATUS"
+  if [ "$STATUS" != "Accepted" ]; then
+    echo "not notarised - leaving the installed copy alone"
+    xcrun notarytool log "$ID" $KEY 2>&1 | head -30
+    exit 1
+  fi
   xcrun stapler staple "$APP"
 fi
 

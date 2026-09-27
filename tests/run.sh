@@ -6,9 +6,9 @@ CORE="$HERE/../app/Clerk/Clerk/Core"
 OUT="${TMPDIR:-/tmp}/clerk-tests"
 
 # -target matters: on macOS 27 a bare swiftc stamps a minos the binary cannot run on.
-swiftc -target arm64-apple-macos13.0 -O \
+swiftc -target arm64-apple-macos27.0 -O \
   "$CORE/Fields.swift" "$CORE/Store.swift" "$CORE/Match.swift" \
-  "$CORE/Jev.swift" "$CORE/Importer.swift" "$HERE/main.swift" \
+  "$CORE/Jev.swift" "$CORE/OnDevice.swift" "$CORE/Importer.swift" "$HERE/main.swift" \
   -o "$OUT"
 # Read the key here, with the `security` tool the keychain already trusts. The
 # test binary is compiled fresh every run, so it is a stranger to every keychain

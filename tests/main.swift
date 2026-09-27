@@ -400,6 +400,36 @@ func checkHebrewStateVsCountry() -> Int {
 
 /// Card and bank boxes: refused until Moshe switches them on.
 /// A card or bank line must never be handed to the AI, whichever button is used.
+/// Apple's model, on real lines. Skipped when Apple Intelligence is off, so the
+/// suite still runs on a Mac without it.
+func checkOnDevice() async -> Int {
+    guard OnDevice.available else {
+        print("\non-device reading\n  skipped — \(OnDevice.whyNot ?? "not available)")")
+        return 0
+    }
+    var bad = 0
+    print("\non-device reading")
+    let fields = Fields.all.map { (key: $0.key, question: $0.question) }
+    let names = [(id: "nolan", name: "Nolan"), (id: "leon", name: "Leon")]
+    let cases: [(String, String, String?)] = [
+        ("Leon passport: J22222222", "passport_number", "leon"),
+        ("expires 27 Mar 2028", "passport_expiry", nil),
+        ("Numéro de passeport 561967958", "passport_number", nil),
+        ("Nolan cell 845 555 0101", "phone", "nolan"),
+        ("Visa 4111 1111 1111 1111", "card_number", nil),
+    ]
+    let t = Date()
+    for (line, wantField, wantPerson) in cases {
+        let got = await OnDevice.read(line: line, fields: fields, people: names)
+        let ok = got?.field == wantField && (wantPerson == nil || got?.person == wantPerson)
+        if !ok { bad += 1 }
+        print("  \(ok ? "ok   " : "WRONG") \(line.padding(toLength: 32, withPad: " ", startingAt: 0)) -> \(got?.field ?? "nothing") \(got?.person ?? "")")
+    }
+    print(String(format: "  %d lines in %.1fs, and none of it left the Mac",
+                 cases.count, Date().timeIntervalSince(t)))
+    return bad
+}
+
 func checkNeverSent() -> Int {
     var bad = 0
     print("\nlines the AI must never see")
@@ -737,6 +767,7 @@ Task {
     failures += await checkNeverFill()
     failures += await checkPages()
     failures += checkHebrewStateVsCountry()
+    failures += await checkOnDevice()
     failures += checkNeverSent()
     failures += checkPayment()
     failures += checkDates()

@@ -1319,3 +1319,50 @@ fine. Signing failed too, because `--timestamp` needs Apple as well.
 **Do not install unnotarised to get around it** - Safari silently drops the
 extension. Leave the working build in `/Applications`, commit the code, and try
 again later.
+
+## Reading a paste happens ON THIS MAC
+
+`Core/OnDevice.swift` wraps Apple's Foundation Models framework. The app is
+built for **macOS 27**, so the model is simply there - no availability dance,
+only a check that Apple Intelligence is switched on.
+
+**Why it matters:** the paste importer was the ONE place a real value left the
+Mac. That exception is gone. A card number, a routing number and a social
+security number are all read here, by the machine they are already on.
+
+- `Importer.classifyLeftovers` uses it for **every** leftover line when it is
+  available. Jev stays as the fallback when Apple Intelligence is off, and then
+  the old guard applies - card and bank lines are held back and never sent.
+- The Import button says **"Read on this Mac"** when it is on-device, and Setup
+  shows which of the two is in use.
+- It is NOT used for filling a form. Filling has to feel instant and only ever
+  sees labels anyway.
+
+**Measured on 2026-09-27, not assumed:**
+
+| | |
+|---|---|
+| one line | about 1 second |
+| 20 lines, one at a time | 17.6s |
+| 20 lines, all at once | 13.0s |
+| Jev, for comparison | about 50ms a line |
+
+So it is roughly thirteen times slower, which is fine for something done rarely
+and wrong for something done on every click.
+
+**A whole paste in one call was tried and rejected.** 16 rows in 10.5s, and it
+carried the person across a block correctly, but it mangled values - "KTN 998877"
+came back whole as the value, and a passport line came back as a national ID. The
+local pass already splits label from value exactly, so only the leftover lines go
+to the model, one at a time.
+
+**The instruction has to say that the VALUE decides.** Without that line,
+"Visa 4111 1111 1111 1111" came back as `card_name` - it read "Visa" as a name.
+With it, five of five right, and it also stopped attributing a person to lines
+that do not name one. `tests/run.sh` runs those five for real and skips them with
+a note when Apple Intelligence is off.
+
+**A new file in Core/ must be added to `ADD` in `tools/fix_project.py`** and to
+the compile line in `tests/run.sh`. The project is regenerated from scratch every
+build, so nothing is picked up automatically. Both were missed here and showed up
+as "cannot find 'OnDevice' in scope".

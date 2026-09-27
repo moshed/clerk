@@ -620,11 +620,16 @@ private struct ImportSheet: View {
                 Button("Sort it out here") { Task { await extract(useAI: false) } }
                     .disabled(raw.isEmpty || busy)
                     .help("Patterns only. Nothing leaves this Mac.")
-                Button(busy ? "Reading…" : "Extract with AI") { Task { await extract(useAI: true) } }
+                Button(busy ? "Reading…"
+                            : (OnDevice.available ? "Read on this Mac" : "Extract with AI")) {
+                    Task { await extract(useAI: true) }
+                }
                     .buttonStyle(.borderedProminent)
                     .disabled(raw.isEmpty || busy)
-                    .help("Sends the lines the patterns could not read. Card, bank and "
-                          + "social security numbers are never sent, whichever you press.")
+                    .help(OnDevice.available
+                          ? "Apple's model, running here. Nothing leaves this Mac."
+                          : "Sends the lines the patterns could not read. Card, bank and "
+                            + "social security numbers are never sent.")
             }
         }
         .padding(20)
@@ -875,6 +880,12 @@ private struct SetupView: View {
             } header: {
                 Label("Updates and AI", systemImage: "arrow.triangle.2.circlepath")
             } footer: {
+                LabeledContent("Reading a paste") {
+                    Text(OnDevice.available
+                         ? "Apple's model, on this Mac"
+                         : "sent to the AI — \(OnDevice.whyNot ?? "")")
+                        .foregroundStyle(.secondary)
+                }
                 Text("Card and bank boxes are left alone until you switch them on. "
                      + "One click fills every box on a page, and an account and routing "
                      + "number together are enough to take money by direct debit, so this "
