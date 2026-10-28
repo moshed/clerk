@@ -7,11 +7,20 @@
 # `notarytool --wait` gives up with "deadlineExceeded" - which reads like the
 # upload failed when it did not. Nothing is installed unless it is Accepted.
 set -uo pipefail
+
+# App Store Connect credentials live outside the repo: this is a public
+# repository and the key id and issuer id identify the Apple account.
+# ~/.private_keys/asc.env sets ASC_KEY_PATH, ASC_KEY_ID and ASC_ISSUER_ID.
+if [ -z "${ASC_KEY_ID:-}" ] && [ -f "$HOME/.private_keys/asc.env" ]; then
+  . "$HOME/.private_keys/asc.env"
+fi
+: "${ASC_KEY_PATH:?set ASC_KEY_PATH or create ~/.private_keys/asc.env}"
+: "${ASC_KEY_ID:?set ASC_KEY_ID or create ~/.private_keys/asc.env}"
+: "${ASC_ISSUER_ID:?set ASC_ISSUER_ID or create ~/.private_keys/asc.env}"
 ID="${1:?a submission id}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APP="$ROOT/app/build/Build/Products/Release/Clerk.app"
-KEY=(--key $ASC_KEY_PATH
-     --key-id $ASC_KEY_ID --issuer $ASC_ISSUER_ID)
+KEY=(--key "$ASC_KEY_PATH" --key-id "$ASC_KEY_ID" --issuer "$ASC_ISSUER_ID")
 
 for _ in $(seq 1 180); do                       # up to about an hour
   STATUS=$(xcrun notarytool info "$ID" "${KEY[@]}" 2>&1 | awk '/status:/{print $2}')

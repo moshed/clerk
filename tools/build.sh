@@ -9,6 +9,16 @@
 # skeleton it insists on making into the SwiftUI menu-bar app. So the project is
 # thrown away and rebuilt every time, and `extension/` plus `app/Clerk/
 # Clerk/{ClerkApp,SettingsView,Core}` are the only sources that matter.
+# App Store Connect credentials live outside the repo: this is a public
+# repository and the key id and issuer id identify the Apple account.
+# ~/.private_keys/asc.env sets ASC_KEY_PATH, ASC_KEY_ID and ASC_ISSUER_ID.
+if [ -z "${ASC_KEY_ID:-}" ] && [ -f "$HOME/.private_keys/asc.env" ]; then
+  . "$HOME/.private_keys/asc.env"
+fi
+: "${ASC_KEY_PATH:?set ASC_KEY_PATH or create ~/.private_keys/asc.env}"
+: "${ASC_KEY_ID:?set ASC_KEY_ID or create ~/.private_keys/asc.env}"
+: "${ASC_ISSUER_ID:?set ASC_ISSUER_ID or create ~/.private_keys/asc.env}"
+
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -96,8 +106,7 @@ if [ "${1:-}" != "--no-install" ]; then
   # did not: on 2026-09-23 six runs in a row "failed" that way while every
   # submission was sitting in Apple's queue, accepted later. Polling `info`
   # tells the truth and costs nothing.
-  KEY="--key $ASC_KEY_PATH"
-  KEY="$KEY --key-id $ASC_KEY_ID --issuer $ASC_ISSUER_ID"
+  KEY="--key $ASC_KEY_PATH --key-id $ASC_KEY_ID --issuer $ASC_ISSUER_ID"
   # Capture it all first. Piping into `awk ... exit` closes the pipe early,
   # notarytool dies of SIGPIPE, pipefail sees it and the script walks out
   # silently after printing "notarising…".
